@@ -1,5 +1,7 @@
 package com.azure.cosmos.examples.crudquickstart.async;
 
+import java.util.Iterator;
+import java.util.List;
 import java.util.prefs.PreferenceChangeEvent;
 import java.util.stream.Collectors;
 
@@ -169,33 +171,15 @@ public class SampleFoodAsync {
     String continuationToken = null;
     int documentNumber = 0;
     int counter = 0;
-
+    int preferredPageSize = 10;
+    List<Food> results;
     FeedResponse<Food> feedResponse = null;
-    CosmosPagedFlux<Food> pagedFluxResponse = asyncContainer.queryItems(query, queryRequestOptions, Food.class);
-
-    do {
-
-      System.out.println("counter: " + counter);
-
-      if (continuationToken == null) {
-        feedResponse = pagedFluxResponse.byPage().blockLast();
-      } else {
-        feedResponse = pagedFluxResponse.byPage(continuationToken).blockLast();
-      }
-
-      continuationToken = feedResponse.getContinuationToken();
-      System.out.println("Continuation token: " + continuationToken);
-
-      feedResponse.getResults().forEach(item -> {
-        System.out
-            .println(item.getId() + " " + item.getDescription() + " " + item.getVersion() + " " + item.getFoodGroup());
-      });
-
-      documentNumber += feedResponse.getResults().size();
-      logger.info(String.format("Total documents received so far: %d", documentNumber));
-
-    } while (continuationToken != null);
-
+    Iterator<FeedResponse<Food>> responseIterator = asyncContainer.queryItems(query, queryRequestOptions, Food.class).byPage().toIterable().iterator();
+    while(responseIterator.hasNext()){
+      FeedResponse<Food> response = responseIterator.next();
+      results = response.getResults();
+      logger.info("Got " + results.size() + " items(s)");
+    }
     System.out.println("fell through");
   }
 }
