@@ -1,11 +1,14 @@
 package com.azure.cosmos.examples.crudquickstart.async;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.prefs.PreferenceChangeEvent;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.azure.core.util.paging.ContinuablePagedFlux;
 import com.azure.core.util.paging.ContinuablePagedIterable;
 import com.azure.cosmos.CosmosAsyncClient;
 import com.azure.cosmos.CosmosAsyncContainer;
@@ -17,12 +20,14 @@ import com.azure.cosmos.CosmosDatabase;
 import com.azure.cosmos.CosmosException;
 import com.azure.cosmos.examples.common.AccountSettings;
 import com.azure.cosmos.examples.common.Food;
+import com.azure.cosmos.implementation.FeedResponseDiagnostics;
 import com.azure.cosmos.models.CosmosDatabaseRequestOptions;
 import com.azure.cosmos.models.CosmosQueryRequestOptions;
 import com.azure.cosmos.models.FeedResponse;
 import com.azure.cosmos.util.CosmosPagedFlux;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class SampleFoodAsync {
 
@@ -164,35 +169,39 @@ public class SampleFoodAsync {
 
     System.out.println("query with async and continuation token");
 
-    System.out.println("Page size: " + pageSize);
-
-    String continuationToken = null;
     int documentNumber = 0;
-    int counter = 0;
+    int loopCounter = 0;
+    String continuationToken = null;
 
     FeedResponse<Food> feedResponse = null;
     CosmosPagedFlux<Food> pagedFluxResponse = asyncContainer.queryItems(query, queryRequestOptions, Food.class);
 
+    // Mono<FeedResponse<Food>> mono = pagedFluxResponse.byPage(pageSize).next();
+    // feedResponse = mono.block();
+    
+    // logger.warn("continuation token: " + feedResponse.getContinuationToken()); 
+    // logger.warn("number of results: " + feedResponse.getResults().size()); 
     do {
 
-      System.out.println("counter: " + counter);
+      System.out.println("loop counter: " + loopCounter);
+      loopCounter++;
 
       if (continuationToken == null) {
-        feedResponse = pagedFluxResponse.byPage().blockLast();
+        feedResponse = pagedFluxResponse.byPage(pageSize).next().block();
       } else {
-        feedResponse = pagedFluxResponse.byPage(continuationToken).blockLast();
+        feedResponse = pagedFluxResponse.byPage(continuationToken).next().block();
       }
 
       continuationToken = feedResponse.getContinuationToken();
-      System.out.println("Continuation token: " + continuationToken);
+      logger.warn("Continuation token: " + continuationToken);
 
-      feedResponse.getResults().forEach(item -> {
-        System.out
-            .println(item.getId() + " " + item.getDescription() + " " + item.getVersion() + " " + item.getFoodGroup());
-      });
+      logger.warn("headers: " + feedResponse.getResponseHeaders().toString());
+
+      List<Food> list = feedResponse.getResults();
+      logger.warn("number of items returned: " + list.size());
 
       documentNumber += feedResponse.getResults().size();
-      logger.info(String.format("Total documents received so far: %d", documentNumber));
+      logger.warn(String.format("Total documents received so far: %d", documentNumber));
 
     } while (continuationToken != null);
 
